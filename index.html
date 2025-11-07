@@ -8,13 +8,13 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             text-align: center;
-            background-color: #f0f8ff; /* Jasnoniebieski */
+            background-color: #f0f8ff;
             margin: 0;
             padding: 20px;
         }
         h1 {
             margin-top: 20px;
-            color: #1e90ff; /* Niebieski */
+            color: #1e90ff;
             font-size: 32px;
         }
         .stats-bar {
@@ -41,7 +41,7 @@
         }
         .game-board {
             display: grid;
-            grid-template-columns: repeat(4, 120px); /* 8 par = 16 kart -> 4x4 */
+            grid-template-columns: repeat(4, 120px);
             grid-gap: 15px;
             justify-content: center;
             margin-top: 30px;
@@ -49,7 +49,7 @@
         .card {
             width: 120px;
             height: 120px;
-            background-color: #6495ed; /* Błękit kornwalijski */
+            background-color: #6495ed;
             border-radius: 12px;
             display: flex;
             flex-direction: column;
@@ -72,10 +72,10 @@
             color: black;
             border: 3px solid #1e90ff;
             transform: rotateY(0deg);
-            pointer-events: none; /* Odwrócona karta jest nieklikalna */
+            pointer-events: none;
         }
         .card.matched {
-            border-color: #3cb371; /* Kolor dopasowania */
+            border-color: #3cb371;
             opacity: 0.7;
             pointer-events: none;
         }
@@ -99,7 +99,6 @@
             flex-direction: column;
             align-items: center;
         }
-        /* Zawartość początkowa (znak zapytania) */
         .card:not(.flipped) .initial-content {
             font-size: 40px;
             font-weight: bold;
@@ -134,14 +133,47 @@
         let lockBoard = false;
         let attempts = 0;
         let matchedPairs = 0;
-
+        
+        // Synteza mowy
         const synth = window.speechSynthesis;
+        let englishVoice = null; // Zmienna do przechowywania wybranego głosu
+
+        // Funkcja próbuje znaleźć angielski głos
+        function setEnglishVoice() {
+            const voices = synth.getVoices();
+            // Szukamy głosu z językiem angielskim (en-US, en-GB itp.)
+            englishVoice = voices.find(voice => voice.lang.startsWith('en'));
+        }
+
+        // Ważne: Głosy mogą być dostępne dopiero po załadowaniu
+        if (synth.onvoiceschanged !== undefined) {
+            synth.onvoiceschanged = setEnglishVoice;
+        } else {
+            setEnglishVoice();
+        }
+
+        function speakEnglish(text) {
+            if (!synth) return;
+
+            // Dodajemy małe opóźnienie, aby mowa nie kolidowała z animacją
+            setTimeout(() => {
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.lang = 'en-US';
+                
+                // Użycie wybranego głosu, jeśli dostępny
+                if (englishVoice) {
+                    utter.voice = englishVoice;
+                }
+
+                synth.speak(utter);
+            }, 100); 
+        }
 
         function updateStats() {
             attemptsDisplay.textContent = `Próby: ${attempts}`;
             matchedCountDisplay.textContent = `Pary: ${matchedPairs}/${ANIMALS.length}`;
             if (matchedPairs === ANIMALS.length) {
-                setTimeout(() => alert(`Gratulacje! Wygrałeś w ${attempts} próbach!`), 300);
+                setTimeout(() => alert(`🎉 Gratulacje! Wygrałeś w ${attempts} próbach!`), 500);
             }
         }
 
@@ -151,13 +183,11 @@
             card.dataset.pairId = cardData.pairId;
             card.dataset.isEnglish = cardData.isEnglish;
 
-            // Początkowa zawartość (znak zapytania)
             const initialContent = document.createElement('div');
             initialContent.classList.add('initial-content');
             initialContent.textContent = '❓';
             card.appendChild(initialContent);
 
-            // Ukryta zawartość (słówko i obrazek)
             const hiddenContent = document.createElement('div');
             hiddenContent.classList.add('hidden-content');
             
@@ -166,7 +196,7 @@
             emoji.textContent = cardData.img;
 
             const text = document.createElement('div');
-            text.textContent = cardData.text.charAt(0).toUpperCase() + cardData.text.slice(1); // U Caps
+            text.textContent = cardData.text.charAt(0).toUpperCase() + cardData.text.slice(1);
 
             const langFlag = document.createElement('span');
             langFlag.classList.add('card-lang');
@@ -182,12 +212,13 @@
         }
 
         function setupGame() {
+            // ... (logika tworzenia i tasowania kart)
             cards = [];
             ANIMALS.forEach(pair => {
                 cards.push({ text: pair.en, pairId: pair.en, img: pair.img, isEnglish: 'true' });
                 cards.push({ text: pair.pl, pairId: pair.en, img: pair.img, isEnglish: 'false' });
             });
-            cards.sort(() => 0.5 - Math.random()); // Tasowanie
+            cards.sort(() => 0.5 - Math.random()); 
 
             board.innerHTML = '';
             cards.forEach(cardData => {
@@ -210,9 +241,7 @@
             // Odtwarzanie audio dla kart angielskich
             if (this.dataset.isEnglish === 'true') {
                 const textToSpeak = this.querySelector('.hidden-content > div:nth-child(2)').textContent;
-                const utter = new SpeechSynthesisUtterance(textToSpeak);
-                utter.lang = 'en-US';
-                synth.speak(utter);
+                speakEnglish(textToSpeak); // Używamy nowej funkcji
             }
 
             if (!firstCard) {
@@ -264,6 +293,8 @@
             matchedCountDisplay = document.getElementById('matchedCount');
             document.getElementById('resetButton').addEventListener('click', setupGame);
             setupGame();
+            // Dla pewności, spróbuj znaleźć głosy również po DOMContentLoaded
+            if (!englishVoice) setEnglishVoice();
         });
     </script>
 </body>
