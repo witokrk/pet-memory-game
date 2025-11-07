@@ -1,164 +1,153 @@
-// PetMemoryGame.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import MemoryCard from "./MemoryCard"; // Pamiętaj o imporcie!
 
-// ===== STAŁE GRY =====
-const FLIP_TIMEOUT = 900; // Czas, po jakim karty się odwrócą (w milisekundach)
-
-// ===== DANE =====
+// ===== DATA =====
 const TRANSLATIONS = {
-    turtle: "żółw",
-    kitten: "kotek",
-    puppy: "szczeniak",
-    rabbit: "królik",
-    bird: "ptak",
-    fish: "ryba",
-    lizard: "jaszczurka",
-    hamster: "chomik",
+  turtle: "żółw",
+  kitten: "kotek",
+  puppy: "szczeniak",
+  rabbit: "królik",
+  bird: "ptak",
+  fish: "ryba",
+  lizard: "jaszczurka",
+  hamster: "chomik",
 };
 
 const IMAGES = {
-    turtle: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f422.svg",
-    kitten: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f431.svg",
-    puppy: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f436.svg",
-    rabbit: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f430.svg",
-    bird: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f426.svg",
-    fish: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f41f.svg",
-    lizard: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f98e.svg",
-    hamster: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f439.svg",
+  turtle: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f422.svg",
+  kitten: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f431.svg",
+  puppy: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f436.svg",
+  rabbit: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f430.svg",
+  bird: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f426.svg",
+  fish: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f41f.svg",
+  lizard: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f98e.svg",
+  hamster: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f439.svg",
 };
 
-const ANIMALS = Object.keys(TRANSLATIONS); // Użycie kluczy z TRANSLATIONS gwarantuje spójność
+const ANIMALS = ["turtle", "kitten", "puppy", "rabbit", "bird", "fish", "lizard", "hamster"];
 
-// ===== FUNKCJA POMOCNICZA =====
+// ===== HELPERS =====
 const makeDeck = () => {
-    // Dla każdego zwierzęcia stwórz 2 karty: EN + PL
-    const deck = ANIMALS.flatMap((name, i) => [
-        { id: i * 2, name, lang: "en", img: IMAGES[name], flipped: false, matched: false },
-        { id: i * 2 + 1, name, lang: "pl", img: IMAGES[name], flipped: false, matched: false },
-    ]);
-    
-    // Tasowanie – Fisher–Yates
-    for (let i = deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-    return deck;
+  // For each animal create 2 cards: EN + PL
+  const deck = ANIMALS.flatMap((name, i) => [
+    { key: `${name}-en`, id: i * 2, name, lang: "en", img: IMAGES[name], flipped: false, matched: false },
+    { key: `${name}-pl`, id: i * 2 + 1, name, lang: "pl", img: IMAGES[name], flipped: false, matched: false },
+  ]);
+  // Shuffle – Fisher–Yates
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
 };
 
-// ===== GŁÓWNY KOMPONENT GRY =====
 export default function PetMemoryGame() {
-    const [cards, setCards] = useState(makeDeck);
-    const [flipped, setFlipped] = useState([]); // Przechowuje OBIEKTY dwóch odkrytych kart
-    const [moves, setMoves] = useState(0);
-    const lockRef = useRef(false); // Zapobiega trzykrotnemu kliknięciu podczas timeoutu
+  const [cards, setCards] = useState(makeDeck);
+  const [flipped, setFlipped] = useState([]); // stores two card objects
+  const [moves, setMoves] = useState(0);
+  const lockRef = useRef(false); // prevents triple-click during timeout
 
-    // Obliczenia wydajnościowe
-    const matchedCount = useMemo(() => cards.filter((c) => c.matched).length / 2, [cards]);
-    const allMatched = useMemo(() => cards.every((c) => c.matched), [cards]);
+  const matchedCount = useMemo(() => cards.filter((c) => c.matched).length / 2, [cards]);
+  const allMatched = useMemo(() => cards.every((c) => c.matched), [cards]);
 
-    const reset = () => {
-        setCards(makeDeck());
+  const reset = () => {
+    setCards(makeDeck());
+    setFlipped([]);
+    setMoves(0);
+    lockRef.current = false;
+  };
+
+  const handleFlip = (id) => {
+    if (lockRef.current) return;
+    const already = cards.find((c) => c.id === id);
+    if (!already || already.flipped || already.matched) return;
+
+    const next = cards.map((c) => (c.id === id ? { ...c, flipped: true } : c));
+    const clicked = next.find((c) => c.id === id);
+    const newlyFlipped = [...flipped, clicked];
+
+    if (newlyFlipped.length === 2) {
+      setMoves((m) => m + 1);
+      const [a, b] = newlyFlipped;
+      if (a.name === b.name) {
+        // Match regardless of language
+        const matched = next.map((c) => (c.id === a.id || c.id === b.id ? { ...c, matched: true } : c));
+        setCards(matched);
         setFlipped([]);
-        setMoves(0);
-        lockRef.current = false;
+      } else {
+        setCards(next);
+        lockRef.current = true;
+        setTimeout(() => {
+          setCards((curr) => curr.map((c) => (c.id === a.id || c.id === b.id ? { ...c, flipped: false } : c)));
+          lockRef.current = false;
+        }, 800);
+        setFlipped([]);
+      }
+    } else {
+      setCards(next);
+      setFlipped(newlyFlipped);
+    }
+  };
+
+  // Keyboard accessibility: R resets game
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key.toLowerCase() === "r") reset();
     };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
-    /**
-     * Obsługuje kliknięcie w kartę.
-     * @param {number} id - Unikalny identyfikator klikniętej karty.
-     */
-    const handleFlip = (id) => {
-        if (lockRef.current) return;
-        
-        const cardToFlip = cards.find((c) => c.id === id);
-        if (!cardToFlip || cardToFlip.flipped || cardToFlip.matched) return;
-
-        // 1. Oznacz klikniętą kartę jako odwróconą
-        const nextCards = cards.map((c) => (c.id === id ? { ...c, flipped: true } : c));
-        const newlyFlippedCard = nextCards.find((c) => c.id === id);
-        
-        // Tablica dwóch odkrytych kart (wliczając obecną)
-        const newlyFlipped = [...flipped, newlyFlippedCard];
-
-        if (newlyFlipped.length === 2) {
-            setMoves((m) => m + 1);
-            const [cardA, cardB] = newlyFlipped;
-            
-            if (cardA.name === cardB.name) {
-                // 2a. DOPASOWANIE: Zablokuj karty jako 'matched'
-                const matchedCards = nextCards.map((c) => 
-                    (c.id === cardA.id || c.id === cardB.id ? { ...c, matched: true } : c)
-                );
-                setCards(matchedCards);
-                setFlipped([]);
-            } else {
-                // 2b. BRAK DOPASOWANIA: Pokaż i odwróć po chwili
-                setCards(nextCards); // Pokaż na chwilę drugą kartę
-                lockRef.current = true; // Zablokuj dalsze kliknięcia
-                
-                setTimeout(() => {
-                    // Odwróć obie karty z powrotem na 'flipped: false'
-                    setCards((curr) => 
-                        curr.map((c) => (c.id === cardA.id || c.id === cardB.id ? { ...c, flipped: false } : c))
-                    );
-                    lockRef.current = false; // Odblokuj kliknięcia
-                }, FLIP_TIMEOUT);
-                setFlipped([]);
-            }
-        } else {
-            // 3. Odkryta tylko jedna karta
-            setCards(nextCards);
-            setFlipped(newlyFlipped);
-        }
-    };
-
-    // Dostępność: Reset gry klawiszem 'R'
-    useEffect(() => {
-        const onKey = (e) => {
-            if (e.key.toLowerCase() === "r") reset();
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, []);
-
-    // ===== RENDEROWANIE =====
-    return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-blue-100 to-blue-200 p-6">
-            {/* Nagłówek i Statystyki */}
-            <div className="w-full max-w-3xl flex flex-col md:flex-row items-center justify-between gap-3 mb-6">
-                <h1 className="text-4xl font-extrabold text-blue-800">🐾 Pet Vocabulary Memory</h1>
-                <div className="flex items-center gap-4">
-                    <div className="rounded-xl bg-white/90 px-3 py-2 shadow text-blue-700 font-semibold">Ruchy: {moves}</div>
-                    <div className="rounded-xl bg-white/90 px-3 py-2 shadow text-green-700 font-semibold">Pary: {matchedCount}/8</div>
-                    <button
-                        onClick={reset}
-                        className="rounded-2xl px-4 py-2 bg-white shadow hover:shadow-lg transition text-blue-700 font-semibold border-2 border-blue-200"
-                        title="Reset (R)"
-                    >
-                        Reset
-                    </button>
-                </div>
-            </div>
-
-            {/* Siatka Kart */}
-            <div className="grid grid-cols-4 gap-4 max-w-3xl">
-                {cards.map((card) => (
-                    // Używamy wyodrębnionego komponentu MemoryCard
-                    <MemoryCard 
-                        key={card.id} // Użycie unikalnego ID jako klucza
-                        card={card} 
-                        onFlip={handleFlip} 
-                    />
-                ))}
-            </div>
-
-            {/* Banner Zwycięstwa */}
-            {allMatched && (
-                <div className="mt-8 rounded-2xl bg-white/95 border-4 border-green-500 px-6 py-4 shadow-xl text-2xl text-green-700 font-bold animate-pulse">
-                    🎉 Super! Wszystkie pary znalezione w {moves} ruchach!
-                </div>
-            )}
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-blue-100 to-blue-200 p-6">
+      {/* Header */}
+      <div className="w-full max-w-3xl flex flex-col md:flex-row items-center justify-between gap-3 mb-4">
+        <h1 className="text-3xl font-bold text-blue-700">🐾 Pet Memory Game</h1>
+        <div className="flex items-center gap-4">
+          <div className="rounded-xl bg-white/90 px-3 py-2 shadow text-blue-700 font-semibold">Ruchy: {moves}</div>
+          <div className="rounded-xl bg-white/90 px-3 py-2 shadow text-green-700 font-semibold">Pary: {matchedCount}/8</div>
+          <button
+            onClick={reset}
+            className="rounded-2xl px-4 py-2 bg-white shadow hover:shadow-md transition text-blue-700 font-semibold"
+            title="Reset (R)"
+          >
+            Reset
+          </button>
         </div>
-    );
+      </div>
+
+      {/* Grid */}
+      <div className="grid grid-cols-4 gap-4">
+        {cards.map((card) => {
+          const show = card.flipped || card.matched;
+          const label = card.lang === "en" ? card.name : TRANSLATIONS[card.name];
+          const flag = card.lang === "en" ? "🇬🇧" : "🇵🇱";
+          return (
+            <button
+              key={card.key}
+              onClick={() => (show ? undefined : handleFlip(card.id))}
+              aria-label={show ? label : "hidden card"}
+              className="w-28 h-28 bg-white rounded-2xl shadow-md flex items-center justify-center cursor-pointer transition-transform duration-200 active:scale-95 select-none relative overflow-hidden"
+            >
+              {show ? (
+                <div className="flex flex-col items-center gap-1 p-2">
+                  <img src={card.img} alt={card.name} className="w-16 h-16 object-contain" />
+                  <span className="text-sm font-medium capitalize text-blue-700">{label}</span>
+                  <span className="absolute top-2 right-2 text-lg" aria-hidden>{flag}</span>
+                </div>
+              ) : (
+                <div className="text-3xl">❓</div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Win banner */}
+      {allMatched && (
+        <div className="mt-6 rounded-2xl bg-white/80 px-6 py-3 shadow text-green-700 font-semibold">
+          🎉 Super! Wszystkie pary znalezione w {moves} ruchach!
+        </div>
+      )}
+    </div>
+  );
 }
