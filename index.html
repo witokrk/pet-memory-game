@@ -1,222 +1,74 @@
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Pet Memory Game</title>
-<style>
-  :root { --tile: 118px; }
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f7fafc;margin:0;padding:24px;color:#1f2937;text-align:center}
-  h1{margin:0 0 6px}
-  .meta{color:#6b7280;margin:0 0 12px}
-  .panel{display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;margin:10px 0 20px}
-  .badge{padding:6px 10px;border:1px solid #e5e7eb;border-radius:999px;background:#fff;box-shadow:0 1px 0 #e5e7eb}
-  .btn{padding:8px 14px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;cursor:pointer}
-  .btn:disabled{opacity:.5;cursor:not-allowed}
-  .grid{display:grid;gap:14px;grid-template-columns:repeat(4,var(--tile));justify-content:center;margin:0 auto}
-  .card{width:var(--tile);height:var(--tile);perspective:1000px}
-  .inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .45s ease}
-  .flipped .inner{transform:rotateY(180deg)}
-  .face{position:absolute;inset:0;border-radius:16px;display:flex;align-items:center;justify-content:center;padding:8px;backface-visibility:hidden;border:1px solid #e5e7eb}
-  .back{background:#ffffff}
-  .front{transform:rotateY(180deg);background:#fff}
-  .pet{display:flex;flex-direction:column;align-items:center;gap:6px}
-  .emoji{font-size:44px;line-height:1}
-  .label{font-weight:800}
-  .small{font-size:12px;color:#6b7280}
-  .matched{outline:3px solid #34d399;outline-offset:2px}
-  .note{font-size:12px;color:#6b7280;margin-top:12px}
-  @media (max-width:480px){ :root{--tile: 88px;} }
-</style>
-</head>
-<body>
-  <h1>🐾 Pet Memory Game</h1>
-  <p class="meta">Dopasuj pary i ucz się nazw po angielsku. Kliknięta karta czyta nazwę na głos.</p>
+import { useState } from "react";
 
-  <div class="panel">
-    <span class="badge" id="moves">Ruchy: 0</span>
-    <span class="badge" id="pairs">Pary: 0/8</span>
-    <span class="badge" id="time">Czas: 0:00</span>
-    <button class="btn" id="restart">🔄 Zagraj jeszcze raz</button>
-    <button class="btn" id="toggle-tts">🔊 Lektor EN: ON</button>
-  </div>
+const animals = [
+  { name: "turtle", img: "https://cdn-icons-png.flaticon.com/512/616/616408.png" },
+  { name: "kitten", img: "https://cdn-icons-png.flaticon.com/512/616/616408.png" },
+  { name: "puppy", img: "https://cdn-icons-png.flaticon.com/512/616/616408.png" },
+  { name: "rabbit", img: "https://cdn-icons-png.flaticon.com/512/616/616408.png" },
+  { name: "bird", img: "https://cdn-icons-png.flaticon.com/512/616/616408.png" },
+  { name: "fish", img: "https://cdn-icons-png.flaticon.com/512/616/616408.png" },
+  { name: "lizard", img: "https://cdn-icons-png.flaticon.com/512/616/616408.png" },
+  { name: "hamster", img: "https://cdn-icons-png.flaticon.com/512/616/616408.png" },
+];
 
-  <div class="grid" id="board" aria-label="Plansza memory 4x4"></div>
-  <p id="status" class="meta" aria-live="polite"></p>
-  <p class="note">Jeśli nie słyszysz dźwięku: odblokuj dźwięk w przeglądarce i upewnij się, że masz włączoną głośność. iOS/Android: pierwszy klik zwykle musi być wykonany użytkownikiem.</p>
+const PetMemoryGame = () => {
+  const [cards, setCards] = useState(
+    [...animals, ...animals]
+      .sort(() => Math.random() - 0.5)
+      .map((card, index) => ({ ...card, id: index, flipped: false, matched: false }))
+  );
+  const [flippedCards, setFlippedCards] = useState([]);
 
-<script>
-  // ===== Dane kart (emoji + etykieta EN) =====
-  const PETS = [
-    { key:'turtle',  emoji:'🐢', label:'Turtle',  color:'#ecfdf5' },
-    { key:'kitten',  emoji:'🐱', label:'Kitten',  color:'#fce7f3' },
-    { key:'puppy',   emoji:'🐶', label:'Puppy',   color:'#fef3c7' },
-    { key:'rabbit',  emoji:'🐰', label:'Rabbit',  color:'#e0e7ff' },
-    { key:'bird',    emoji:'🐦', label:'Bird',    color:'#e0f2fe' },
-    { key:'fish',    emoji:'🐟', label:'Fish',    color:'#cffafe' },
-    { key:'lizard',  emoji:'🦎', label:'Lizard',  color:'#ecfccb' },
-    { key:'hamster', emoji:'🐹', label:'Hamster', color:'#ffedd5' },
-  ];
+  const handleFlip = (id) => {
+    const newCards = [...cards];
+    const flippedCard = newCards.find((c) => c.id === id);
+    if (flippedCard.flipped || flippedCard.matched) return;
 
-  // ===== Stan gry =====
-  let deck = [];
-  let first = null, second = null, busy = false;
-  let moves = 0, matches = 0;
-  let t0 = null, tickId = null;
-  let ttsOn = true, chosenVoice = null;
+    flippedCard.flipped = true;
+    const newFlippedCards = [...flippedCards, flippedCard];
 
-  const $ = (id)=>document.getElementById(id);
-  const boardEl = $('board'), statusEl = $('status');
-
-  // ===== TTS (Web Speech API) =====
-  function pickEnglishVoice() {
-    const voices = speechSynthesis.getVoices();
-    // spróbuj en-US/en-GB jako pierwsze
-    return voices.find(v=>/en-(US|GB)/i.test(v.lang)) ||
-           voices.find(v=>/en/i.test(v.lang)) || null;
-  }
-
-  function speakEN(text) {
-    if (!ttsOn || !('speechSynthesis' in window)) return;
-    if (!chosenVoice) chosenVoice = pickEnglishVoice();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = chosenVoice?.lang || 'en-US';
-    if (chosenVoice) u.voice = chosenVoice;
-    u.rate = 0.95; u.pitch = 1.0; u.volume = 1.0;
-    window.speechSynthesis.cancel(); // zatrzymaj poprzednie
-    window.speechSynthesis.speak(u);
-  }
-
-  // Na niektórych przeglądarkach głosy ładują się asynchronicznie
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.onvoiceschanged = () => { chosenVoice = pickEnglishVoice(); };
-  }
-
-  // ===== Pomocnicze =====
-  function shuffle(a){
-    const arr = a.slice();
-    for(let i=arr.length-1;i>0;i--){
-      const j = Math.floor(Math.random()*(i+1));
-      [arr[i],arr[j]]=[arr[j],arr[i]];
+    if (newFlippedCards.length === 2) {
+      const [first, second] = newFlippedCards;
+      if (first.name === second.name) {
+        newCards[first.id].matched = true;
+        newCards[second.id].matched = true;
+      } else {
+        setTimeout(() => {
+          newCards[first.id].flipped = false;
+          newCards[second.id].flipped = false;
+          setCards([...newCards]);
+        }, 800);
+      }
+      setFlippedCards([]);
+    } else {
+      setFlippedCards(newFlippedCards);
     }
-    return arr;
-  }
-  function timeFmt(sec){
-    const m = Math.floor(sec/60), s = sec%60;
-    return `${m}:${String(s).padStart(2,'0')}`;
-  }
 
-  // ===== Budowa talii i start =====
-  function freshDeck(){
-    const doubled = PETS.flatMap(p=>[
-      { ...p, id:p.key+'-1', flipped:false, matched:false },
-      { ...p, id:p.key+'-2', flipped:false, matched:false },
-    ]);
-    return shuffle(doubled);
-  }
+    setCards([...newCards]);
+  };
 
-  function drawBoard(){
-    boardEl.innerHTML = '';
-    deck.forEach((c,idx)=>{
-      const card = document.createElement('button');
-      card.className = 'card' + (c.matched ? ' matched' : '');
-      card.setAttribute('aria-label', c.label);
-      card.addEventListener('click', ()=>flip(idx));
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-blue-100 to-blue-200 p-4">
+      <h1 className="text-3xl font-bold text-blue-700 mb-6">🐾 Pet Memory Game 🐾</h1>
+      <div className="grid grid-cols-4 gap-4">
+        {cards.map((card) => (
+          <div
+            key={card.id}
+            onClick={() => handleFlip(card.id)}
+            className={`w-24 h-24 bg-white rounded-2xl shadow-md flex items-center justify-center cursor-pointer transition-all duration-300 transform ${
+              card.flipped || card.matched ? "rotate-y-180" : ""
+            }`}
+          >
+            {card.flipped || card.matched ? (
+              <img src={card.img} alt={card.name} className="w-16 h-16" />
+            ) : (
+              <div className="text-3xl">❓</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
-      const inner = document.createElement('div');
-      inner.className = 'inner'+(c.flipped||c.matched?' flipped':'');
-      card.appendChild(inner);
-
-      // front (odsłonięta)
-      const front = document.createElement('div');
-      front.className='face front';
-      front.style.background=c.color;
-      front.innerHTML = `
-        <div class="pet">
-          <div class="emoji">${c.emoji}</div>
-          <div class="label">${c.label}</div>
-          <div class="small">EN</div>
-        </div>`;
-      inner.appendChild(front);
-
-      // back (zakryta)
-      const back = document.createElement('div');
-      back.className='face back';
-      back.innerHTML = `
-        <div class="pet">
-          <div class="emoji">❓</div>
-          <div class="small">Click</div>
-        </div>`;
-      inner.appendChild(back);
-
-      boardEl.appendChild(card);
-    });
-    $('moves').textContent = `Ruchy: ${moves}`;
-    $('pairs').textContent = `Pary: ${matches}/8`;
-  }
-
-  function start(){
-    deck = freshDeck();
-    first=second=null; busy=false; moves=0; matches=0;
-    t0 = Date.now();
-    if (tickId) clearInterval(tickId);
-    tickId = setInterval(()=>{
-      const sec = Math.floor((Date.now()-t0)/1000);
-      $('time').textContent = 'Czas: ' + timeFmt(sec);
-    }, 500);
-    statusEl.textContent = '';
-    drawBoard();
-  }
-
-  // ===== Logika odwracania i dopasowań =====
-  function flip(idx){
-    if (busy) return;
-    const c = deck[idx];
-    if (c.flipped || c.matched) return;
-
-    c.flipped = true;
-    drawBoard();
-    speakEN(c.label); // czytaj po odsłonięciu
-
-    if (first === null){
-      first = idx; return;
-    }
-    if (second === null && idx !== first){
-      second = idx; busy = true; moves++;
-      const a = deck[first], b = deck[second];
-      const isMatch = a.key === b.key;
-
-      setTimeout(()=>{
-        if (isMatch){
-          a.matched = b.matched = true;
-          matches++;
-          statusEl.textContent = `✅ Dobrze! (${matches}/8)`;
-          if (matches===8){
-            clearInterval(tickId);
-            statusEl.textContent = '🎉 Brawo! Wszystkie pary znalezione.';
-          }
-        } else {
-          a.flipped = b.flipped = false;
-        }
-        first = second = null;
-        busy = false;
-        drawBoard();
-      }, isMatch ? 350 : 800);
-    }
-  }
-
-  // ===== Sterowanie =====
-  $('restart').addEventListener('click', start);
-  $('toggle-tts').addEventListener('click', ()=>{
-    ttsOn = !ttsOn;
-    $('toggle-tts').textContent = ttsOn ? '🔊 Lektor EN: ON' : '🔇 Lektor EN: OFF';
-    if (ttsOn) { // „rozgrzej” głosy – krótki szept
-      if ('speechSynthesis' in window) speakEN('Ready');
-    }
-  });
-
-  // Start gry
-  start();
-</script>
-</body>
-</html>
+export default PetMemoryGame;
