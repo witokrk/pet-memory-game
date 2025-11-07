@@ -1,146 +1,270 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pet Vocabulary Memory</title>
-  <style>
-    :root { --bg1:#e6f0ff; --bg2:#cfe3ff; --blue:#1e5bb8; --green:#177245; }
-    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,sans-serif;background:linear-gradient(#e6f0ff,#cfe3ff) fixed;}
-    .wrap{max-width:960px;margin:24px auto;padding:16px}
-    h1{color:var(--blue);text-align:left;font-size:32px;margin:0 0 12px}
-    .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px}
-    .pill{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:8px 12px;border-radius:12px;color:var(--blue);font-weight:600}
-    .pill.green{color:var(--green)}
-    .btn{background:#fff;border:0;border-radius:14px;padding:8px 14px;box-shadow:0 3px 10px rgba(0,0,0,.12);font-weight:700;color:var(--blue);cursor:pointer}
-    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-    .card{aspect-ratio:1/1;background:#fff;border-radius:18px;box-shadow:0 6px 14px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;user-select:none;transition:transform .15s ease}
-    .card:active{transform:scale(.98)}
-    .hiddenSide{font-size:34px}
-    .face{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px}
-    .face img{width:64px;height:64px;object-fit:contain}
-    .label{font-size:14px;font-weight:600;color:var(--blue);text-transform:capitalize}
-    .flag{position:absolute;top:8px;right:10px;font-size:18px}
-    .banner{margin-top:14px;background:rgba(255,255,255,.85);padding:10px 14px;border-radius:14px;box-shadow:0 6px 14px rgba(0,0,0,.12);color:var(--green);font-weight:700}
-    @media (max-width:620px){.grid{grid-template-columns:repeat(3,1fr)} .card{border-radius:14px} }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Game: Zwierzęta (EN/PL)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            background-color: #f0f8ff; /* Jasnoniebieski */
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            margin-top: 20px;
+            color: #1e90ff; /* Niebieski */
+            font-size: 32px;
+        }
+        .stats-bar {
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            font-size: 18px;
+            color: #333;
+            font-weight: 600;
+        }
+        #resetButton {
+            background-color: #1e90ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: background-color 0.3s;
+        }
+        #resetButton:hover {
+            background-color: #007bb5;
+        }
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 120px); /* 8 par = 16 kart -> 4x4 */
+            grid-gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+        .card {
+            width: 120px;
+            height: 120px;
+            background-color: #6495ed; /* Błękit kornwalijski */
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            user-select: none;
+            transition: transform 0.3s, background-color 0.3s;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        .card:hover:not(.flipped) {
+            transform: scale(1.05);
+            background-color: #5587e2;
+        }
+        .card.flipped {
+            background-color: #fff;
+            color: black;
+            border: 3px solid #1e90ff;
+            transform: rotateY(0deg);
+            pointer-events: none; /* Odwrócona karta jest nieklikalna */
+        }
+        .card.matched {
+            border-color: #3cb371; /* Kolor dopasowania */
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        .card-emoji {
+            font-size: 40px;
+            margin-bottom: 5px;
+        }
+        .card-lang {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #aaa;
+        }
+        .hidden-content {
+            display: none;
+        }
+        .card.flipped .hidden-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        /* Zawartość początkowa (znak zapytania) */
+        .card:not(.flipped) .initial-content {
+            font-size: 40px;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>🐾 Pet Vocabulary Memory</h1>
-    <div class="bar">
-      <div class="pill">Ruchy: <span id="moves">0</span></div>
-      <div class="pill green">Pary: <span id="pairs">0</span>/8</div>
-      <button class="btn" id="resetBtn" title="Reset (R)">Reset</button>
+    <h1>Memory: Naucz się Zwierząt 🐾</h1>
+    <div class="stats-bar">
+        <div id="attempts">Próby: 0</div>
+        <div id="matchedCount">Pary: 0/8</div>
     </div>
-    <div id="grid" class="grid" aria-label="Memory grid"></div>
-    <div id="banner" class="banner" style="display:none"></div>
-  </div>
+    <button id="resetButton">Zacznij od nowa</button>
+    <div class="game-board" id="gameBoard"></div>
 
-  <script>
-    // ===== DATA =====
-    const TRANSLATIONS = { turtle:"żółw", kitten:"kotek", puppy:"szczeniak", rabbit:"królik", bird:"ptak", fish:"ryba", lizard:"jaszczurka", hamster:"chomik" };
-    const IMAGES = {
-      turtle:"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f422.svg",
-      kitten:"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f431.svg",
-      puppy:"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f436.svg",
-      rabbit:"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f430.svg",
-      bird:"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f426.svg",
-      fish:"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f41f.svg",
-      lizard:"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f98e.svg",
-      hamster:"https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f439.svg",
-    };
-    const ANIMALS = ["turtle","kitten","puppy","rabbit","bird","fish","lizard","hamster"];
+    <script>
+        const ANIMALS = [
+            { en: 'turtle', pl: 'żółw', img: '🐢' },
+            { en: 'kitten', pl: 'kotek', img: '🐈' },
+            { en: 'puppy', pl: 'szczeniak', img: '🐕' },
+            { en: 'rabbit', pl: 'królik', img: '🐇' },
+            { en: 'bird', pl: 'ptak', img: '🐦' },
+            { en: 'fish', pl: 'ryba', img: '🐠' },
+            { en: 'lizard', pl: 'jaszczurka', img: '🦎' },
+            { en: 'hamster', pl: 'chomik', img: '🐹' },
+        ];
 
-    // ===== STATE =====
-    const grid = document.getElementById('grid');
-    const movesEl = document.getElementById('moves');
-    const pairsEl = document.getElementById('pairs');
-    const banner = document.getElementById('banner');
-    const resetBtn = document.getElementById('resetBtn');
+        let cards = [];
+        let board, attemptsDisplay, matchedCountDisplay;
+        let firstCard = null;
+        let secondCard = null;
+        let lockBoard = false;
+        let attempts = 0;
+        let matchedPairs = 0;
 
-    let cards = [];            // array of card objects
-    let flipped = [];          // currently flipped (max 2)
-    let moves = 0;             // moves counter
-    let lock = false;          // ignore clicks during timeout
+        const synth = window.speechSynthesis;
 
-    function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
-
-    function makeDeck(){
-      const deck = ANIMALS.flatMap((name, i)=>[
-        { key: name+"-en", id: i*2, name, lang: 'en', img: IMAGES[name], flipped:false, matched:false },
-        { key: name+"-pl", id: i*2+1, name, lang: 'pl', img: IMAGES[name], flipped:false, matched:false },
-      ]);
-      return shuffle(deck);
-    }
-
-    function render(){
-      grid.innerHTML = '';
-      cards.forEach(card=>{
-        const btn = document.createElement('button');
-        btn.className = 'card';
-        btn.setAttribute('aria-label', card.flipped||card.matched ? (card.lang==='en'?card.name:TRANSLATIONS[card.name]) : 'hidden card');
-        btn.addEventListener('click', ()=> onFlip(card.id));
-
-        if(card.flipped || card.matched){
-          const face = document.createElement('div'); face.className='face';
-          const img=document.createElement('img'); img.src=card.img; img.alt=card.name; face.appendChild(img);
-          const label=document.createElement('span'); label.className='label'; label.textContent = card.lang==='en'?card.name:TRANSLATIONS[card.name]; face.appendChild(label);
-          const flag=document.createElement('span'); flag.className='flag'; flag.textContent = card.lang==='en'?'🇬🇧':'🇵🇱'; face.appendChild(flag);
-          btn.appendChild(face);
-        } else {
-          const q=document.createElement('div'); q.className='hiddenSide'; q.textContent='❓'; btn.appendChild(q);
+        function updateStats() {
+            attemptsDisplay.textContent = `Próby: ${attempts}`;
+            matchedCountDisplay.textContent = `Pary: ${matchedPairs}/${ANIMALS.length}`;
+            if (matchedPairs === ANIMALS.length) {
+                setTimeout(() => alert(`Gratulacje! Wygrałeś w ${attempts} próbach!`), 300);
+            }
         }
-        grid.appendChild(btn);
-      });
 
-      // stats
-      movesEl.textContent = moves;
-      pairsEl.textContent = cards.filter(c=>c.matched).length/2;
+        function createCardElement(cardData) {
+            const card = document.createElement('div');
+            card.classList.add('card');
+            card.dataset.pairId = cardData.pairId;
+            card.dataset.isEnglish = cardData.isEnglish;
 
-      if(cards.every(c=>c.matched)){
-        banner.style.display='block';
-        banner.textContent = `🎉 Super! Wszystkie pary znalezione w ${moves} ruchach!`;
-      } else {
-        banner.style.display='none';
-      }
-    }
+            // Początkowa zawartość (znak zapytania)
+            const initialContent = document.createElement('div');
+            initialContent.classList.add('initial-content');
+            initialContent.textContent = '❓';
+            card.appendChild(initialContent);
 
-    function onFlip(id){
-      if(lock) return;
-      const card = cards.find(c=>c.id===id);
-      if(!card || card.flipped || card.matched) return;
+            // Ukryta zawartość (słówko i obrazek)
+            const hiddenContent = document.createElement('div');
+            hiddenContent.classList.add('hidden-content');
+            
+            const emoji = document.createElement('div');
+            emoji.classList.add('card-emoji');
+            emoji.textContent = cardData.img;
 
-      card.flipped = true;
-      flipped.push(card);
+            const text = document.createElement('div');
+            text.textContent = cardData.text.charAt(0).toUpperCase() + cardData.text.slice(1); // U Caps
 
-      if(flipped.length===2){
-        moves++;
-        const [a,b]=flipped;
-        if(a.name===b.name){
-          a.matched=b.matched=true;
-          flipped=[];
-          render();
-        } else {
-          lock=true; render();
-          setTimeout(()=>{
-            a.flipped=b.flipped=false;
-            flipped=[]; lock=false; render();
-          },800);
+            const langFlag = document.createElement('span');
+            langFlag.classList.add('card-lang');
+            langFlag.textContent = cardData.isEnglish === 'true' ? 'EN' : 'PL';
+            
+            hiddenContent.appendChild(emoji);
+            hiddenContent.appendChild(text);
+            hiddenContent.appendChild(langFlag);
+            card.appendChild(hiddenContent);
+
+            card.addEventListener('click', flipCard);
+            return card;
         }
-      }
-      render();
-    }
 
-    function reset(){
-      cards = makeDeck();
-      flipped = []; moves = 0; lock=false; render();
-    }
+        function setupGame() {
+            cards = [];
+            ANIMALS.forEach(pair => {
+                cards.push({ text: pair.en, pairId: pair.en, img: pair.img, isEnglish: 'true' });
+                cards.push({ text: pair.pl, pairId: pair.en, img: pair.img, isEnglish: 'false' });
+            });
+            cards.sort(() => 0.5 - Math.random()); // Tasowanie
 
-    // Init
-    reset();
-    resetBtn.addEventListener('click', reset);
-    window.addEventListener('keydown', e=>{ if(e.key.toLowerCase()==='r') reset(); });
-  </script>
+            board.innerHTML = '';
+            cards.forEach(cardData => {
+                board.appendChild(createCardElement(cardData));
+            });
+
+            attempts = 0;
+            matchedPairs = 0;
+            firstCard = null;
+            secondCard = null;
+            lockBoard = false;
+            updateStats();
+        }
+
+        function flipCard() {
+            if (lockBoard || this.classList.contains('matched') || this === firstCard) return;
+
+            this.classList.add('flipped');
+            
+            // Odtwarzanie audio dla kart angielskich
+            if (this.dataset.isEnglish === 'true') {
+                const textToSpeak = this.querySelector('.hidden-content > div:nth-child(2)').textContent;
+                const utter = new SpeechSynthesisUtterance(textToSpeak);
+                utter.lang = 'en-US';
+                synth.speak(utter);
+            }
+
+            if (!firstCard) {
+                firstCard = this;
+            } else {
+                secondCard = this;
+                attempts++;
+                updateStats();
+                checkForMatch();
+            }
+        }
+
+        function checkForMatch() {
+            const isMatch = firstCard.dataset.pairId === secondCard.dataset.pairId;
+
+            if (isMatch) {
+                disableCards();
+            } else {
+                unflipCards();
+            }
+        }
+
+        function disableCards() {
+            firstCard.classList.add('matched');
+            secondCard.classList.add('matched');
+            matchedPairs++;
+            updateStats();
+            
+            resetBoard();
+        }
+
+        function unflipCards() {
+            lockBoard = true;
+            setTimeout(() => {
+                firstCard.classList.remove('flipped');
+                secondCard.classList.remove('flipped');
+                resetBoard();
+            }, 1000);
+        }
+
+        function resetBoard() {
+            [firstCard, secondCard, lockBoard] = [null, null, false];
+        }
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            board = document.getElementById('gameBoard');
+            attemptsDisplay = document.getElementById('attempts');
+            matchedCountDisplay = document.getElementById('matchedCount');
+            document.getElementById('resetButton').addEventListener('click', setupGame);
+            setupGame();
+        });
+    </script>
 </body>
 </html>
