@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
-const animalTranslations: Record<string, string> = {
+// ---- data ----
+const TRANSLATIONS = {
   turtle: "żółw",
   kitten: "kotek",
   puppy: "szczeniak",
@@ -11,7 +12,7 @@ const animalTranslations: Record<string, string> = {
   hamster: "chomik",
 };
 
-const animalImages: Record<string, string> = {
+const IMAGES = {
   turtle: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f422.svg",
   kitten: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f431.svg",
   puppy: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f436.svg",
@@ -22,73 +23,51 @@ const animalImages: Record<string, string> = {
   hamster: "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f439.svg",
 };
 
-const baseAnimals = [
-  { name: "turtle" },
-  { name: "kitten" },
-  { name: "puppy" },
-  { name: "rabbit" },
-  { name: "bird" },
-  { name: "fish" },
-  { name: "lizard" },
-  { name: "hamster" },
-] as const;
+const BASE = ["turtle", "kitten", "puppy", "rabbit", "bird", "fish", "lizard", "hamster"];
 
-type Card = {
-  id: number;
-  name: string;
-  img: string;
-  flipped: boolean;
-  matched: boolean;
-  language: "pl" | "en";
-};
-
-function useDeck() {
-  const makeShuffled = () => {
-    // create one English and one Polish version for each animal
-    const doubled = baseAnimals.flatMap((a, i) => [
-      { id: i * 2, name: a.name, img: animalImages[a.name], flipped: false, matched: false, language: "en" },
-      { id: i * 2 + 1, name: a.name, img: animalImages[a.name], flipped: false, matched: false, language: "pl" },
-    ]);
-    for (let i = doubled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [doubled[i], doubled[j]] = [doubled[j], doubled[i]];
-    }
-    return doubled as Card[];
-  };
-  const [cards, setCards] = useState<Card[]>(makeShuffled);
-  const reset = () => setCards(makeShuffled());
-  return { cards, setCards, reset };
+// ---- helpers ----
+function shuffledDeck() {
+  // one EN and one PL per animal
+  const deck = BASE.flatMap((name, i) => [
+    { id: i * 2, name, lang: "en", img: IMAGES[name], flipped: false, matched: false },
+    { id: i * 2 + 1, name, lang: "pl", img: IMAGES[name], flipped: false, matched: false },
+  ]);
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  return deck;
 }
 
 export default function PetMemoryGame() {
-  const { cards, setCards, reset } = useDeck();
-  const [flipped, setFlipped] = useState<Card[]>([]);
+  const [cards, setCards] = useState(shuffledDeck);
+  const [flipped, setFlipped] = useState([]); // array of cards
 
   const allMatched = useMemo(() => cards.every((c) => c.matched), [cards]);
 
-  const handleFlip = (id: number) => {
+  const reset = () => {
+    setCards(shuffledDeck());
+    setFlipped([]);
+  };
+
+  const handleFlip = (id) => {
     const next = cards.map((c) => (c.id === id ? { ...c, flipped: true } : c));
-    const clicked = next.find((c) => c.id === id)!;
-    if (clicked.matched || flipped.some((f) => f.id === id)) return;
+    const clicked = next.find((c) => c.id === id);
+    if (!clicked || clicked.matched || flipped.some((f) => f.id === id)) return;
 
     const newlyFlipped = [...flipped, clicked];
 
     if (newlyFlipped.length === 2) {
       const [a, b] = newlyFlipped;
       if (a.name === b.name) {
-        const matched = next.map((c) =>
-          c.id === a.id || c.id === b.id ? { ...c, matched: true } : c
-        );
+        // match regardless of language
+        const matched = next.map((c) => (c.id === a.id || c.id === b.id ? { ...c, matched: true } : c));
         setCards(matched);
         setFlipped([]);
       } else {
         setCards(next);
         setTimeout(() => {
-          setCards((curr) =>
-            curr.map((c) =>
-              c.id === a.id || c.id === b.id ? { ...c, flipped: false } : c
-            )
-          );
+          setCards((curr) => curr.map((c) => (c.id === a.id || c.id === b.id ? { ...c, flipped: false } : c)));
         }, 800);
         setFlipped([]);
       }
@@ -102,38 +81,26 @@ export default function PetMemoryGame() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-blue-100 to-blue-200 p-6">
       <div className="flex items-center gap-3 mb-4">
         <h1 className="text-3xl font-bold text-blue-700">🐾 Pet Memory Game</h1>
-        <button
-          onClick={reset}
-          className="ml-2 rounded-2xl px-4 py-2 bg-white shadow hover:shadow-md transition text-blue-700 font-semibold"
-        >
-          Reset
-        </button>
+        <button onClick={reset} className="ml-2 rounded-2xl px-4 py-2 bg-white shadow hover:shadow-md transition text-blue-700 font-semibold">Reset</button>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
         {cards.map((card) => {
           const show = card.flipped || card.matched;
-          const label =
-            card.language === "en"
-              ? card.name
-              : animalTranslations[card.name];
+          const label = card.lang === "en" ? card.name : TRANSLATIONS[card.name];
+          const badge = card.lang === "en" ? "🇬🇧" : "🇵🇱";
           return (
             <button
               key={card.id}
               onClick={() => (show ? undefined : handleFlip(card.id))}
               aria-label={show ? label : "hidden card"}
-              className={`w-28 h-28 bg-white rounded-2xl shadow-md flex items-center justify-center cursor-pointer transition-transform duration-200 active:scale-95 select-none relative overflow-hidden`}
+              className="w-28 h-28 bg-white rounded-2xl shadow-md flex items-center justify-center cursor-pointer transition-transform duration-200 active:scale-95 select-none relative overflow-hidden"
             >
               {show ? (
                 <div className="flex flex-col items-center gap-1 p-2">
-                  <img
-                    src={card.img}
-                    alt={card.name}
-                    className="w-16 h-16 object-contain"
-                  />
-                  <span className="text-sm font-medium capitalize text-blue-700">
-                    {label}
-                  </span>
+                  <img src={card.img} alt={card.name} className="w-16 h-16 object-contain" />
+                  <span className="text-sm font-medium capitalize text-blue-700">{label}</span>
+                  <span className="absolute top-2 right-2 text-lg" aria-hidden>{badge}</span>
                 </div>
               ) : (
                 <div className="text-3xl">❓</div>
@@ -144,9 +111,7 @@ export default function PetMemoryGame() {
       </div>
 
       {allMatched && (
-        <div className="mt-6 rounded-2xl bg-white/80 px-6 py-3 shadow text-green-700 font-semibold">
-          🎉 Great job! You found all pairs!
-        </div>
+        <div className="mt-6 rounded-2xl bg-white/80 px-6 py-3 shadow text-green-700 font-semibold">🎉 Super! Wszystkie pary znalezione!</div>
       )}
     </div>
   );
